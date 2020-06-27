@@ -76,6 +76,28 @@ class Controller2D(object):
         # Clamp the steering command to valid bounds
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
+    
+    def longitudinal_pid(self,v_desired):
+
+        kp = 0.9
+        kd = 0.2
+        ki = 0.9
+        delta_t = 0.033
+
+ 
+        error = v_desired - self._current_speed 
+        sum_err = self.vars.sum_err + error
+        diff_err = error - self.vars.err_previous
+
+        
+        throttle_output = kp*(error) + kd*(diff_err/delta_t) +ki*(sum_err*delta_t)
+
+        self.vars.err_previous = error # storing the error for next step 
+        self.vars.sum_err = sum_err 
+
+        return throttle_output
+
+
 
     def update_controls(self):
         ######################################################
@@ -114,6 +136,8 @@ class Controller2D(object):
             throttle_output = 0.5 * self.vars.v_previous
         """
         self.vars.create_var('v_previous', 0.0)
+        self.vars.create_var('err_previous',0)
+        self.vars.create_var('sum_err',0)
 
         # Skip the first frame to store previous values properly
         if self._start_control_loop:
@@ -159,11 +183,13 @@ class Controller2D(object):
                 access the persistent variables declared above here. For
                 example, can treat self.vars.v_previous like a "global variable".
             """
+            throttle_output = 0
+            throttle_output = self.longitudinal_pid(v_desired)
             
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
-            throttle_output = 0
+           
             brake_output    = 0
 
             ######################################################
