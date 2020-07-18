@@ -25,6 +25,9 @@ class Controller2D(object):
         self._conv_rad_to_steer  = 180.0 / 70.0 / np.pi
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
+        self._min_idx            = -1
+        self._vehicle_length     = 3 #(in meters)
+       
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -77,7 +80,68 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
-    def longitudinal_pid(self,v_desired):
+
+    def get_cte(self):
+
+        # x, y = self.front_axle_coord()
+        x = self._current_x
+        y = self._current_y
+        i = self._min_idx
+        
+        cte = np.sqrt((self._waypoints[i][0]-x)**2+(self._waypoints[i][1]-y)**2)
+
+        return cte 
+
+    def get_head_err(self):
+
+        waypoints = self._waypoints
+        current_yaw = self._current_yaw
+
+        delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
+        delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+
+        head = np.arctan2(delta_y, delta_x)
+        delta = head - current_yaw
+       
+
+        if delta > np.pi:
+            delta = delta - self._2pi
+        if delta < -np.pi:
+            delta = delta + self._2pi
+
+        return delta
+
+    def lateral_pid(self):
+
+        self.vars.create_var('prev_head_err',0)
+        self.vars.create_var('sum_err_head',0)
+        
+        Kff = 1.0
+        Kp  = 0.6
+        Kd  = 7.0
+        Ki  = 0.0
+        delta_t = 0.033
+        desired_cte = 0
+
+        head_err = self.get_head_err()  
+        cte      = self.get_cte()
+
+        if  head_err < 0:
+            cte   = -1*cte
+        sum_err_head = self.vars.sum_err_head + head_err
+        diff_err = head_err - self.vars.prev_head_err
+        
+        steer_output = Kff*cte + Kp*head_err + Kd*(diff_err/delta_t) + Ki*(sum_err_head*delta_t)
+
+        
+
+        self.vars.sum_err_head = sum_err_head
+        self.vars.prev_head_err = head_err
+        
+        return steer_output
+
+
+    def longitudinal_pid(self, v_desired):
 
         self.vars.create_var('err_previous',0)
         self.vars.create_var('sum_err',0)
@@ -205,7 +269,9 @@ class Controller2D(object):
             """
             
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
+            # steer_output    = 0
+            steer_output = self.lateral_pid()
+            
 
             ######################################################
             # SET CONTROLS OUTPUT
