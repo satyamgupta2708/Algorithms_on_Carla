@@ -596,7 +596,7 @@ def exec_waypoint_nav_demo(args):
             controller.update_values(current_x, current_y, current_yaw, 
                                      current_speed,
                                      current_timestamp, frame)
-            controller.update_controls()
+            controller.update_controls(args.controller_choice)
             cmd_throttle, cmd_steer, cmd_brake = controller.get_commands()
 
             # Skip the first frame (so the controller has proper outputs)
@@ -714,7 +714,13 @@ def main():
         dest='settings_filepath',
         default=None,
         help='Path to a "CarlaSettings.ini" file')
+    argparser.add_argument(
+        '-o', '--controller-choice',
+        choices=['lp', 'pp'],
+        default='lp',
+        help='lateral controller choice')
     args = argparser.parse_args()
+    print(args)
 
     # Logging startup info
     log_level = logging.DEBUG if args.debug else logging.INFO
