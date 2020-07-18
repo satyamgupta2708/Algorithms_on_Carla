@@ -28,6 +28,7 @@ class Controller2D(object):
         self._vehicle_length     = 3
         self._min_idx            = -1
 
+
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
         self._current_y         = y
@@ -116,7 +117,8 @@ class Controller2D(object):
         delta_x = self._waypoints[i+1][0]-self._waypoints[i][0]
 
         slope = np.tan(delta_y/delta_x)
-        cte = np.abs(y - x*slope-(self._waypoints[i][1]-slope*self._waypoints[i][0]))/(np.sqrt(1+slope**2))
+        cte = np.abs(y - x*slope-(self._waypoints[i][1]- \
+            slope*self._waypoints[i][0]))/(np.sqrt(1+slope**2))
         return cte 
 
     def get_head_err(self):
@@ -141,6 +143,30 @@ class Controller2D(object):
             delta = delta + self._2pi
 
         return delta
+
+    def rear_axle_coord(self):
+        l = 1.5 #(in meters)
+        rear_axle_x = self._current_x - l*np.cos(self._current_yaw)
+        rear_axle_y = self._current_y - l*np.sin(self._current_yaw)
+        return rear_axle_x, rear_axle_y 
+
+        
+    def min_index(self, look_ahead_distance):
+        dist = 0
+        min_dist = float("inf")
+        rear_axle_x, rear_axle_y = self.rear_axle_coord() 
+        
+        for i in range(len(self._waypoints)):
+            dist = np.sqrt((self._waypoints[i][0]-rear_axle_x)**2+(self._waypoints[i][1]-rear_axle_y)**2)
+            diff_dist = np.abs(dist - look_ahead_distance)
+            if diff_dist< min_dist:
+                min_dist = diff_dist
+                min_idx = i
+
+
+        return min_idx
+ 
+
 
     def lateral_pid(self):
 
@@ -175,28 +201,24 @@ class Controller2D(object):
         return steer_output
 
 
-    def rear_axle_coord(self):
-        l = 1.5 #(in meters)
-        rear_axle_x = self._current_x - l*np.cos(self._current_yaw)
-        rear_axle_y = self._current_y - l*np.sin(self._current_yaw)
-        return rear_axle_x, rear_axle_y 
+    def stanley(self):
+        min_idx = self._min_idx
+        k = 0.75
+        ks = 0.00
 
-        
-    def min_index(self, look_ahead_distance):
-        dist = 0
-        min_dist = float("inf")
-        rear_axle_x, rear_axle_y = self.rear_axle_coord() 
-        
-        for i in range(len(self._waypoints)):
-            dist = np.sqrt((self._waypoints[i][0]-rear_axle_x)**2+(self._waypoints[i][1]-rear_axle_y)**2)
-            diff_dist = np.abs(dist - look_ahead_distance)
-            if diff_dist< min_dist:
-                min_dist = diff_dist
-                min_idx = i
+        current_speed = self._current_speed
 
-        return min_idx
-    
-  
+        head_err = self.get_head_err()
+        cte = self.get_cte()
+
+        if  head_err < 0:
+            cte   = -1*cte
+
+        steer_output =  head_err + np.arctan2(k*cte,(ks+current_speed))
+        return steer_output
+
+
+
     def longitudinal_pid(self,v_desired):
 
         self.vars.create_var('err_previous',0)
@@ -353,7 +375,9 @@ class Controller2D(object):
             if option == 'lp':
                 print("using lateral pid")
                 steer_output = self.lateral_pid()
-
+            elif option == 'sc':
+                print("using stanley controller")
+                steer_output = self.stanley()
             elif option == 'pp':
                 print("using pure pursuit")
                 steer_output = self.pure_pursuit(x,y,yaw,waypoints)

@@ -717,7 +717,7 @@ def main():
         help='Path to a "CarlaSettings.ini" file')
     argparser.add_argument(
         '-o', '--controller-choice',
-        choices=['lp', 'pp'],
+        choices=['lp', 'pp','sc'],
         default='lp',
         help='lateral controller choice')
     args = argparser.parse_args()
