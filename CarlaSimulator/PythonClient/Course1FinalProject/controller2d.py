@@ -25,6 +25,8 @@ class Controller2D(object):
         self._conv_rad_to_steer  = 180.0 / 70.0 / np.pi
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
+        self._min_idx            = -1
+        self._vehicle_length     = 3 #(in meters)
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -49,6 +51,7 @@ class Controller2D(object):
                 min_idx = i
         if min_idx < len(self._waypoints)-1:
             desired_speed = self._waypoints[min_idx][2]
+            self._min_idx = min_idx
         else:
             desired_speed = self._waypoints[-1][2]
         self._desired_speed = desired_speed
@@ -76,6 +79,62 @@ class Controller2D(object):
         # Clamp the steering command to valid bounds
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
+
+    def _front_axle_coord(self):
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)
+
+        return x,y
+
+
+    def _get_cte(self):
+
+        x, y = self._front_axle_coord()
+        i = self._min_idx
+        
+        cte = np.sqrt((self._waypoints[i][0]-x)**2+(self._waypoints[i][1]-y)**2)
+
+        return cte 
+
+    def _get_head_err(self):
+
+        waypoints = self._waypoints
+        current_yaw = self._current_yaw
+
+        delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
+        delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+
+        head = np.arctan2(delta_y, delta_x)
+        delta = head - current_yaw
+       
+
+        if delta > np.pi:
+            delta = delta - self._2pi
+        if delta < -np.pi:
+            delta = delta + self._2pi
+
+        return delta
+
+
+
+    
+    def stanley(self):
+        min_idx = self._min_idx
+        k = 0.75
+        ks = 0.00
+
+        current_speed = self._current_speed
+
+        head_err = self._get_head_err()
+        cte = self._get_cte()
+
+        if  head_err < 0:
+            cte   = -1*cte
+
+        steer_output =  head_err + np.arctan2(k*cte,(ks+current_speed))
+        return steer_output
+
+
 
     def longitudinal_pid(self,v_desired):
 
@@ -205,7 +264,8 @@ class Controller2D(object):
             """
             
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
+            # steer_output    = 0
+            steer_output = self.stanley()
 
             ######################################################
             # SET CONTROLS OUTPUT
