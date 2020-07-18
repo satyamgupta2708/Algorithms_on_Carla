@@ -77,6 +77,29 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
+    def longitudinal_pid(self,v_desired):
+
+        self.vars.create_var('err_previous',0)
+        self.vars.create_var('sum_err',0)
+
+        kp = 0.9
+        kd = 0.2
+        ki = 0.9
+        delta_t = 0.033
+
+ 
+        error = v_desired - self._current_speed 
+        sum_err = self.vars.sum_err + error
+        diff_err = error - self.vars.err_previous
+
+        
+        throttle_output = kp*(error) + kd*(diff_err/delta_t) +ki*(sum_err*delta_t)
+
+        self.vars.err_previous = error # storing the error for next step 
+        self.vars.sum_err = sum_err 
+
+        return throttle_output    
+
     def update_controls(self):
         ######################################################
         # RETRIEVE SIMULATOR FEEDBACK
@@ -163,8 +186,12 @@ class Controller2D(object):
             # Change these outputs with the longitudinal controller. Note that
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
-            throttle_output = 0
-            brake_output    = 0
+            # throttle_output = 0
+            # brake_output    = 0
+            throttle_output = self.longitudinal_pid(v_desired)
+
+            if throttle_output < 0:
+                brake_output = -1*throttle_output
 
             ######################################################
             ######################################################

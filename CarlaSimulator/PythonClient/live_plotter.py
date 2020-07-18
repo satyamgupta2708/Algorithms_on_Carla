@@ -5,7 +5,8 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.backends.tkagg as tkagg
+# import matplotlib.backends.tkagg as tkagg
+from matplotlib.backends import _backend_tk
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 import pygame
 
@@ -224,7 +225,8 @@ class LivePlotter():
 
         photo = tk.PhotoImage(master=self._canvas, width=f_w, height=f_h)
         self._canvas.create_image(f_w/2, self._graph_h-f_h/2, image=photo)
-        tkagg.blit(photo, fca.get_renderer()._renderer, colormode=2)
+        # tkagg.blit(photo, fca.get_renderer()._renderer, colormode=2)
+        _backend_tk.blit(photo, fca.get_renderer()._renderer, (0,1,2,3))
         self._root.update()
 
         self._figs.append(fig)
@@ -258,10 +260,14 @@ class LivePlotter():
         self._fcas[fig].flush_events()
         fig.canvas.draw()
         fig.canvas.flush_events()
-        tkagg.blit(
+        # # tkagg.blit(
+        #     self._photos[fig],
+        #     self._fcas[fig].get_renderer()._renderer,
+        #     colormode=2)
+        _backend_tk.blit(
             self._photos[fig],
             self._fcas[fig].get_renderer()._renderer,
-            colormode=2)
+            (0,1,2,3))
         self._root.update()
 
     def init_pygame(self):
