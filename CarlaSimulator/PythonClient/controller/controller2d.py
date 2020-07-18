@@ -25,7 +25,8 @@ class Controller2D(object):
         self._conv_rad_to_steer  = 180.0 / 70.0 / np.pi
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
-        self._vehicle_length     = 3 
+        self._vehicle_length     = 3
+        self._min_idx            = -1
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -63,10 +64,11 @@ class Controller2D(object):
         min_idx       = 0
         min_dist      = float("inf")
         desired_speed = 0
+        x,y = self.front_axle_coord()
         for i in range(len(self._waypoints)):
             dist = np.linalg.norm(np.array([
-                    self._waypoints[i][0] - self._current_x,
-                    self._waypoints[i][1] - self._current_y]))
+                    self._waypoints[i][0] - x,
+                    self._waypoints[i][1] - y]))
             if dist < min_dist:
                 min_dist = dist
                 min_idx = i
@@ -101,8 +103,7 @@ class Controller2D(object):
         # Clamp the steering command to valid bounds
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
-
-
+    
 
     def get_cte(self):
 
@@ -174,7 +175,29 @@ class Controller2D(object):
         return steer_output
 
 
-    def longitudinal_pid(self, v_desired):
+    def rear_axle_coord(self):
+        l = 1.5 #(in meters)
+        rear_axle_x = self._current_x - l*np.cos(self._current_yaw)
+        rear_axle_y = self._current_y - l*np.sin(self._current_yaw)
+        return rear_axle_x, rear_axle_y 
+
+        
+    def min_index(self, look_ahead_distance):
+        dist = 0
+        min_dist = float("inf")
+        rear_axle_x, rear_axle_y = self.rear_axle_coord() 
+        
+        for i in range(len(self._waypoints)):
+            dist = np.sqrt((self._waypoints[i][0]-rear_axle_x)**2+(self._waypoints[i][1]-rear_axle_y)**2)
+            diff_dist = np.abs(dist - look_ahead_distance)
+            if diff_dist< min_dist:
+                min_dist = diff_dist
+                min_idx = i
+
+        return min_idx
+    
+  
+    def longitudinal_pid(self,v_desired):
 
         self.vars.create_var('err_previous',0)
         self.vars.create_var('sum_err',0)
@@ -197,8 +220,30 @@ class Controller2D(object):
 
         return throttle_output    
 
-    def update_controls(self):
-        ######################################################
+    def pure_pursuit(self ,x ,y ,yaw ,waypoints):
+
+        
+        Kpp = 1.4 # look ahead distance constant 
+        L = self._vehicle_length
+       
+
+        look_ahead_distance = Kpp * self._current_speed 
+        min_idx = self.min_index(look_ahead_distance)
+     
+        target_x = waypoints[min_idx][0]
+        target_y = waypoints[min_idx][1]
+
+        cte = ((target_y-y)*np.cos(yaw)-(target_x-x)*np.sin(yaw))  ###cross_track_error 
+             
+            
+        k = 2*cte/(look_ahead_distance**2) 
+        steer_output = np.arctan(k*L)
+
+        return steer_output
+
+
+    def update_controls(self, option):
+       ######################################################
         # RETRIEVE SIMULATOR FEEDBACK
         ######################################################
         x               = self._current_x
@@ -303,8 +348,18 @@ class Controller2D(object):
             
             # Change the steer output with the lateral controller. 
             # steer_output    = 0
-            steer_output = self.lateral_pid()
+            steer_output = 0
+            
+            if option == 'lp':
+                print("using lateral pid")
+                steer_output = self.lateral_pid()
 
+            elif option == 'pp':
+                print("using pure pursuit")
+                steer_output = self.pure_pursuit(x,y,yaw,waypoints)
+            
+
+ 
             ######################################################
             # SET CONTROLS OUTPUT
             ######################################################
