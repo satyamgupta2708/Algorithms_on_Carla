@@ -39,19 +39,43 @@ class Controller2D(object):
         if self._current_frame:
             self._start_control_loop = True
 
+    # def update_desired_speed(self):
+    #     min_idx       = 0
+    #     min_dist      = float("inf")
+    #     desired_speed = 0
+    #     for i in range(len(self._waypoints)):
+    #         dist = np.linalg.norm(np.array([
+    #                 self._waypoints[i][0] - self._current_x,
+    #                 self._waypoints[i][1] - self._current_y]))
+    #         if dist < min_dist:
+    #             min_dist = dist
+    #             min_idx = i
+    #     if min_idx < len(self._waypoints)-1:
+    #         desired_speed = self._waypoints[min_idx][2]
+    #     else:
+    #         desired_speed = self._waypoints[-1][2]
+
+    def front_axle_coord(self):
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)
+
+        return x,y
+
     def update_desired_speed(self):
         min_idx       = 0
         min_dist      = float("inf")
         desired_speed = 0
+        x, y = self.front_axle_coord()
         for i in range(len(self._waypoints)):
             dist = np.linalg.norm(np.array([
-                    self._waypoints[i][0] - self._current_x,
-                    self._waypoints[i][1] - self._current_y]))
+                    self._waypoints[i][0] - x,
+                    self._waypoints[i][1] - y]))
             if dist < min_dist:
                 min_dist = dist
                 min_idx = i
         if min_idx < len(self._waypoints)-1:
             desired_speed = self._waypoints[min_idx][2]
+            self._min_idx = min_idx
         else:
             desired_speed = self._waypoints[-1][2]
         self._desired_speed = desired_speed
@@ -80,12 +104,9 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
-
     def get_cte(self):
 
-        # x, y = self.front_axle_coord()
-        x = self._current_x
-        y = self._current_y
+        x, y = self.front_axle_coord()
         i = self._min_idx
         
         cte = np.sqrt((self._waypoints[i][0]-x)**2+(self._waypoints[i][1]-y)**2)
@@ -128,12 +149,13 @@ class Controller2D(object):
 
         if  head_err < 0:
             cte   = -1*cte
+            
         sum_err_head = self.vars.sum_err_head + head_err
         diff_err = head_err - self.vars.prev_head_err
         
-        steer_output = Kff*cte + Kp*head_err + Kd*(diff_err/delta_t) + Ki*(sum_err_head*delta_t)
+        # steer_output = Kff*cte + Kp*head_err + Kd*(diff_err/delta_t) + Ki*(sum_err_head*delta_t)
 
-        
+        steer_output = Kff*head_err + Kp*cte
 
         self.vars.sum_err_head = sum_err_head
         self.vars.prev_head_err = head_err
