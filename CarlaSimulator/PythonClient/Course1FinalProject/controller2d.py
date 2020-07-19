@@ -38,14 +38,40 @@ class Controller2D(object):
         if self._current_frame:
             self._start_control_loop = True
 
+    # def update_desired_speed(self):
+    #     min_idx       = 0
+    #     min_dist      = float("inf")
+    #     desired_speed = 0
+    #     for i in range(len(self._waypoints)):
+    #         dist = np.linalg.norm(np.array([
+    #                 self._waypoints[i][0] - self._current_x,
+    #                 self._waypoints[i][1] - self._current_y]))
+    #         if dist < min_dist:
+    #             min_dist = dist
+    #             min_idx = i
+    #     if min_idx < len(self._waypoints)-1:
+    #         desired_speed = self._waypoints[min_idx][2]
+    #         self._min_idx = min_idx
+    #     else:
+    #         desired_speed = self._waypoints[-1][2]
+    #     self._desired_speed = desired_speed
+
+    def _front_axle_coord(self):
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)
+
+        return x,y
+
+
     def update_desired_speed(self):
         min_idx       = 0
         min_dist      = float("inf")
         desired_speed = 0
+        x, y = self._front_axle_coord()
         for i in range(len(self._waypoints)):
             dist = np.linalg.norm(np.array([
-                    self._waypoints[i][0] - self._current_x,
-                    self._waypoints[i][1] - self._current_y]))
+                    self._waypoints[i][0] - x,
+                    self._waypoints[i][1] - y]))
             if dist < min_dist:
                 min_dist = dist
                 min_idx = i
@@ -54,7 +80,10 @@ class Controller2D(object):
             self._min_idx = min_idx
         else:
             desired_speed = self._waypoints[-1][2]
+            self._min_idx = -1
+
         self._desired_speed = desired_speed
+        
 
     def update_waypoints(self, new_waypoints):
         self._waypoints = new_waypoints
@@ -80,11 +109,7 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
-    def _front_axle_coord(self):
-        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)
-        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)
-
-        return x,y
+    
 
 
     def _get_cte(self):
@@ -100,10 +125,15 @@ class Controller2D(object):
 
         waypoints = self._waypoints
         current_yaw = self._current_yaw
-
-        delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
-        delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
-
+        
+        try:
+            delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
+            delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+        except :
+            delta_x = 0
+            delta_y = 0 
+            
+        
         head = np.arctan2(delta_y, delta_x)
         delta = head - current_yaw
        
@@ -120,7 +150,7 @@ class Controller2D(object):
     
     def stanley(self):
         min_idx = self._min_idx
-        k = 0.75
+        k = 0.15
         ks = 0.00
 
         current_speed = self._current_speed
@@ -132,6 +162,7 @@ class Controller2D(object):
             cte   = -1*cte
 
         steer_output =  head_err + np.arctan2(k*cte,(ks+current_speed))
+        print(steer_output)
         return steer_output
 
 
