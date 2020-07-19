@@ -76,7 +76,7 @@ PLOT_WIDTH         = 0.8
 PLOT_HEIGHT        = 0.8
 
 WAYPOINTS_FILENAME = 'racetrack_waypoints.txt'  # waypoint file to load
-DIST_THRESHOLD_TO_LAST_WAYPOINT = 2.0  # some distance from last position before
+DIST_THRESHOLD_TO_LAST_WAYPOINT = 4.5  # some distance from last position before
                                        # simulation ends
                                        
 # Path interpolation parameters
@@ -715,6 +715,7 @@ def main():
         default=None,
         help='Path to a "CarlaSettings.ini" file')
     args = argparser.parse_args()
+    print(args)
 
     # Logging startup info
     log_level = logging.DEBUG if args.debug else logging.INFO
