@@ -56,8 +56,8 @@ class Controller2D(object):
     #         desired_speed = self._waypoints[-1][2]
 
     def front_axle_coord(self):
-        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)
-        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)/2
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)/2
 
         return x,y
 
@@ -78,6 +78,7 @@ class Controller2D(object):
             self._min_idx = min_idx
         else:
             desired_speed = self._waypoints[-1][2]
+            self._min_idx = -1
         self._desired_speed = desired_speed
 
     def update_waypoints(self, new_waypoints):
@@ -104,13 +105,20 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
+
+
     def get_cte(self):
 
         x, y = self.front_axle_coord()
         i = self._min_idx
-        
-        cte = np.sqrt((self._waypoints[i][0]-x)**2+(self._waypoints[i][1]-y)**2)
 
+        # cte = np.sqrt((self._waypoints[i][1]-y)**2+(self._waypoints[i][0]-x)**2)
+
+        delta_y = self._waypoints[i+1][1]-self._waypoints[i][1]
+        delta_x = self._waypoints[i+1][0]-self._waypoints[i][0]
+
+        slope = np.tan(delta_y/delta_x)
+        cte = np.abs(y - x*slope-(self._waypoints[i][1]-slope*self._waypoints[i][0]))/(np.sqrt(1+slope**2))
         return cte 
 
     def get_head_err(self):
@@ -118,8 +126,12 @@ class Controller2D(object):
         waypoints = self._waypoints
         current_yaw = self._current_yaw
 
-        delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
-        delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+        try:
+            delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
+            delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+        except:
+            delta_x = 0
+            delta_y = 0
 
         head = np.arctan2(delta_y, delta_x)
         delta = head - current_yaw
@@ -134,32 +146,34 @@ class Controller2D(object):
 
     def lateral_pid(self):
 
-        self.vars.create_var('prev_head_err',0)
-        self.vars.create_var('sum_err_head',0)
+        self.vars.create_var('prev_cte',0)
+        self.vars.create_var('cte',0)
+        self.vars.create_var('sum_cte',0)
         
+
         Kff = 1.0
-        Kp  = 0.6
-        Kd  = 7.0
-        Ki  = 0.0
+        Kp  = 0.0
+        Kd  = 0.0
+        Ki  = 1.0
         delta_t = 0.033
         desired_cte = 0
 
         head_err = self.get_head_err()  
         cte      = self.get_cte()
 
+         
         if  head_err < 0:
             cte   = -1*cte
-            
-        sum_err_head = self.vars.sum_err_head + head_err
-        diff_err = head_err - self.vars.prev_head_err
-        
-        # steer_output = Kff*cte + Kp*head_err + Kd*(diff_err/delta_t) + Ki*(sum_err_head*delta_t)
 
-        steer_output = Kff*head_err + Kp*cte
-
-        self.vars.sum_err_head = sum_err_head
-        self.vars.prev_head_err = head_err
+        diff_err = cte - self.vars.cte
+        self.vars.sum_cte =+ cte  
         
+        steer_output = Kff*cte + Ki*self.vars.sum_cte*delta_t + Kd*(diff_err/delta_t)
+        
+        self.vars.prev_cte = cte
+        
+        
+        print (steer_output)
         return steer_output
 
 
