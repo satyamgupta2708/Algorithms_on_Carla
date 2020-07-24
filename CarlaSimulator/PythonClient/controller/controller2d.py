@@ -25,6 +25,7 @@ class Controller2D(object):
         self._conv_rad_to_steer  = 180.0 / 70.0 / np.pi
         self._pi                 = np.pi
         self._2pi                = 2.0 * np.pi
+        self._vehicle_length     = 3 
 
     def update_values(self, x, y, yaw, speed, timestamp, frame):
         self._current_x         = x
@@ -35,6 +36,28 @@ class Controller2D(object):
         self._current_frame     = frame
         if self._current_frame:
             self._start_control_loop = True
+
+    # def update_desired_speed(self):
+    #     min_idx       = 0
+    #     min_dist      = float("inf")
+    #     desired_speed = 0
+    #     for i in range(len(self._waypoints)):
+    #         dist = np.linalg.norm(np.array([
+    #                 self._waypoints[i][0] - self._current_x,
+    #                 self._waypoints[i][1] - self._current_y]))
+    #         if dist < min_dist:
+    #             min_dist = dist
+    #             min_idx = i
+    #     if min_idx < len(self._waypoints)-1:
+    #         desired_speed = self._waypoints[min_idx][2]
+    #     else:
+    #         desired_speed = self._waypoints[-1][2]
+
+    def front_axle_coord(self):
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)/2
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)/2
+
+        return x,y
 
     def update_desired_speed(self):
         min_idx       = 0
@@ -49,8 +72,10 @@ class Controller2D(object):
                 min_idx = i
         if min_idx < len(self._waypoints)-1:
             desired_speed = self._waypoints[min_idx][2]
+            self._min_idx = min_idx
         else:
             desired_speed = self._waypoints[-1][2]
+            self._min_idx = -1
         self._desired_speed = desired_speed
 
     def update_waypoints(self, new_waypoints):
@@ -77,7 +102,79 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
-    def longitudinal_pid(self,v_desired):
+
+
+    def get_cte(self):
+
+        x, y = self.front_axle_coord()
+        i = self._min_idx
+
+        # cte = np.sqrt((self._waypoints[i][1]-y)**2+(self._waypoints[i][0]-x)**2)
+
+        delta_y = self._waypoints[i+1][1]-self._waypoints[i][1]
+        delta_x = self._waypoints[i+1][0]-self._waypoints[i][0]
+
+        slope = np.tan(delta_y/delta_x)
+        cte = np.abs(y - x*slope-(self._waypoints[i][1]-slope*self._waypoints[i][0]))/(np.sqrt(1+slope**2))
+        return cte 
+
+    def get_head_err(self):
+
+        waypoints = self._waypoints
+        current_yaw = self._current_yaw
+
+        try:
+            delta_y = waypoints[self._min_idx+1][1]- waypoints[self._min_idx][1]
+            delta_x = waypoints[self._min_idx+1][0]- waypoints[self._min_idx][0]
+        except:
+            delta_x = 0
+            delta_y = 0
+
+        head = np.arctan2(delta_y, delta_x)
+        delta = head - current_yaw
+       
+
+        if delta > np.pi:
+            delta = delta - self._2pi
+        if delta < -np.pi:
+            delta = delta + self._2pi
+
+        return delta
+
+    def lateral_pid(self):
+
+        self.vars.create_var('prev_cte',0)
+        self.vars.create_var('cte',0)
+        self.vars.create_var('sum_cte',0)
+        
+
+       
+        Kp  = 1.0
+        Kd  = 0.0
+        Ki  = 0.0
+        delta_t = 0.033
+        desired_cte = 0
+
+        head_err = self.get_head_err()  
+        cte      = self.get_cte()
+
+         
+        if  head_err < 0:
+            cte   = -1*cte
+
+        diff_err = cte - self.vars.cte
+        self.vars.sum_cte =+ cte  
+        
+        steer_output = Kp*cte + Ki*self.vars.sum_cte*delta_t + Kd*(diff_err/delta_t)
+        
+        self.vars.prev_cte = cte
+        
+        
+        print (steer_output)
+        return steer_output
+
+
+    def longitudinal_pid(self, v_desired):
 
         self.vars.create_var('err_previous',0)
         self.vars.create_var('sum_err',0)
@@ -205,7 +302,8 @@ class Controller2D(object):
             """
             
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
+            # steer_output    = 0
+            steer_output = self.lateral_pid()
 
             ######################################################
             # SET CONTROLS OUTPUT
