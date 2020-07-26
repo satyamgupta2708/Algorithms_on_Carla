@@ -231,7 +231,7 @@ def write_trajectory_file(x_list, y_list, v_list, t_list):
             trajectory_file.write('%3.3f, %3.3f, %2.3f, %6.3f\n' %\
                                   (x_list[i], y_list[i], v_list[i], t_list[i]))
 
-def exec_waypoint_nav_demo(args):
+def exec_waypoint_nav_demo(args,kp =1.0,ki=1.0,kd=0):
     """ Executes waypoint navigation demo.
     """
 
@@ -597,7 +597,7 @@ def exec_waypoint_nav_demo(args):
             controller.update_values(current_x, current_y, current_yaw, 
                                      current_speed,
                                      current_timestamp, frame)
-            controller.update_controls(args.controller_choice)
+            controller.update_controls(args.controller_choice,kp,ki,kd)
             cmd_throttle, cmd_steer, cmd_brake = controller.get_commands()
 
             # Skip the first frame (so the controller has proper outputs)
@@ -717,10 +717,19 @@ def main():
         help='Path to a "CarlaSettings.ini" file')
     argparser.add_argument(
         '-o', '--controller-choice',
-        choices=['lp', 'pp','sc'],
-        default='lp',
-        help='lateral controller choice')
+        choices=['lp', 'pp','sc','lp-d'],
+        default='lp-d',
+        help='lateral controller choice..lp-d stands for default gains of lateral PID')
     args = argparser.parse_args()
+    # print("enter your gains for longitudinal PID")
+    
+    # Kp = float(input("enter Kp="))
+    # Ki = float(input("enter Ki="))
+    # Kd = float(input("enter Kd="))
+
+    # if args.controller_choice
+
+
     print(args)
 
     # Logging startup info
@@ -733,7 +742,15 @@ def main():
     # Execute when server connection is established
     while True:
         try:
-            exec_waypoint_nav_demo(args)
+            if args.controller_choice =='lp':
+                print("enter your gains for longitudinal PID")
+    
+                kp = float(input("enter kp="))
+                ki = float(input("enter ki="))
+                kd = float(input("enter kd="))
+                exec_waypoint_nav_demo(args,kp,ki,kd)
+            else :
+                exec_waypoint_nav_demo(args)
             print('Done.')
             return
 

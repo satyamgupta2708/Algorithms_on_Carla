@@ -168,17 +168,13 @@ class Controller2D(object):
  
 
 
-    def lateral_pid(self):
+    def lateral_pid(self,kp=1.0,ki=0.0,kd=0.0):
 
         self.vars.create_var('prev_cte',0)
         self.vars.create_var('cte',0)
         self.vars.create_var('sum_cte',0)
         
 
-       
-        Kp  = 1.0
-        Kd  = 0.0
-        Ki  = 0.0
         delta_t = 0.033
         desired_cte = 0
 
@@ -192,12 +188,13 @@ class Controller2D(object):
         diff_err = cte - self.vars.cte
         self.vars.sum_cte =+ cte  
         
-        steer_output = Kp*cte + Ki*self.vars.sum_cte*delta_t + Kd*(diff_err/delta_t)
+        steer_output = kp*cte + ki*self.vars.sum_cte*delta_t + kd*(diff_err/delta_t)
         
         self.vars.prev_cte = cte
         
         
         print (steer_output)
+        print("kp",kp,"ki",ki,"kd",kd)
         return steer_output
 
 
@@ -219,14 +216,11 @@ class Controller2D(object):
 
 
 
-    def longitudinal_pid(self,v_desired):
+    def longitudinal_pid(self,v_desired,kp=0.9,kd=0.2,ki=0.9):
 
         self.vars.create_var('err_previous',0)
         self.vars.create_var('sum_err',0)
 
-        kp = 0.9
-        kd = 0.2
-        ki = 0.9
         delta_t = 0.033
 
  
@@ -239,6 +233,8 @@ class Controller2D(object):
 
         self.vars.err_previous = error # storing the error for next step 
         self.vars.sum_err = sum_err 
+
+        # print("kp",kp,"ki",ki,"kd",kd)
 
         return throttle_output    
 
@@ -264,7 +260,7 @@ class Controller2D(object):
         return steer_output
 
 
-    def update_controls(self, option):
+    def update_controls(self,option,kp,ki,kd):
        ######################################################
         # RETRIEVE SIMULATOR FEEDBACK
         ######################################################
@@ -352,7 +348,7 @@ class Controller2D(object):
             # assignment, as the car will naturally slow down over time.
             # throttle_output = 0
             # brake_output    = 0
-            throttle_output = self.longitudinal_pid(v_desired)
+            throttle_output = self.longitudinal_pid(v_desired,)
 
             if throttle_output < 0:
                 brake_output = -1*throttle_output
@@ -372,9 +368,10 @@ class Controller2D(object):
             # steer_output    = 0
             steer_output = 0
             
-            if option == 'lp':
+            if option == 'lp' or option == 'lp-d':
                 print("using lateral pid")
-                steer_output = self.lateral_pid()
+                print(kp,ki,kd)
+                steer_output = self.lateral_pid(kp,ki,kd)
             elif option == 'sc':
                 print("using stanley controller")
                 steer_output = self.stanley()
