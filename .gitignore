@@ -1,5 +1,7 @@
 *pycache*
+*pyc
 *envs/
 CarlaSimulator/*
+*controller_output*
 
 !CarlaSimulator/PythonClient*
