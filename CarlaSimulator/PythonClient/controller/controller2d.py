@@ -214,7 +214,7 @@ class Controller2D(object):
         return steer_output
 
 
-    def stanley(self,k = 0.75,ks = 0.00):
+    def stanley(self,k = 0.5,ks = 20.00):
         min_idx = self._min_idx
         
         current_speed = self._current_speed

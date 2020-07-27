@@ -673,7 +673,7 @@ def exec_waypoint_nav_demo(args):
         store_trajectory_plot(brake_fig.fig, 'brake_output.png')
         store_trajectory_plot(steer_fig.fig, 'steer_output.png')
         write_trajectory_file(x_history, y_history, speed_history, time_history)
-        print("average_displacement_error(in meters) was found out to be =",ade)
+        
 def main():
     """Main function.
 
@@ -722,7 +722,7 @@ def main():
     argparser.add_argument(
         '-o', '--controller-choice',
         choices=['lp', 'pp','sc'],
-        default='lp',
+        default='sc',
         help='lateral controller choice')
     args = argparser.parse_args()
 
@@ -752,4 +752,5 @@ if __name__ == '__main__':
         main()
     except KeyboardInterrupt:
         print('\nCancelled by user. Bye!')
+        # print("average_displacement_error(in meters) was found out to be =",ade)
 
