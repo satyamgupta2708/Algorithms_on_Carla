@@ -231,7 +231,7 @@ def write_trajectory_file(x_list, y_list, v_list, t_list):
             trajectory_file.write('%3.3f, %3.3f, %2.3f, %6.3f\n' %\
                                   (x_list[i], y_list[i], v_list[i], t_list[i]))
 
-def exec_waypoint_nav_demo(args,kp =1.0,ki=1.0,kd=0):
+def exec_waypoint_nav_demo(args):
     """ Executes waypoint navigation demo.
     """
 
@@ -597,8 +597,10 @@ def exec_waypoint_nav_demo(args,kp =1.0,ki=1.0,kd=0):
             controller.update_values(current_x, current_y, current_yaw, 
                                      current_speed,
                                      current_timestamp, frame)
-            controller.update_controls(args.controller_choice,kp,ki,kd)
+            controller.update_controls(args.controller_choice)
             cmd_throttle, cmd_steer, cmd_brake = controller.get_commands()
+            ade = controller.average_displacement_error()
+
 
             # Skip the first frame (so the controller has proper outputs)
             if skip_first_frame and frame == 0:
@@ -658,6 +660,8 @@ def exec_waypoint_nav_demo(args,kp =1.0,ki=1.0,kd=0):
         # directory.
         if reached_the_end:
             print("Reached the end of path. Writing to controller_output...")
+            print("average_displacement_error(in meters) was found out to be =",ade)
+
         else:
             print("Exceeded assessment time. Writing to controller_output...")
         # Stop the car
@@ -669,7 +673,7 @@ def exec_waypoint_nav_demo(args,kp =1.0,ki=1.0,kd=0):
         store_trajectory_plot(brake_fig.fig, 'brake_output.png')
         store_trajectory_plot(steer_fig.fig, 'steer_output.png')
         write_trajectory_file(x_history, y_history, speed_history, time_history)
-
+        print("average_displacement_error(in meters) was found out to be =",ade)
 def main():
     """Main function.
 
@@ -717,20 +721,12 @@ def main():
         help='Path to a "CarlaSettings.ini" file')
     argparser.add_argument(
         '-o', '--controller-choice',
-        choices=['lp', 'pp','sc','lp-d'],
-        default='lp-d',
-        help='lateral controller choice..lp-d stands for default gains of lateral PID')
+        choices=['lp', 'pp','sc'],
+        default='lp',
+        help='lateral controller choice')
     args = argparser.parse_args()
-    # print("enter your gains for longitudinal PID")
-    
-    # Kp = float(input("enter Kp="))
-    # Ki = float(input("enter Ki="))
-    # Kd = float(input("enter Kd="))
 
-    # if args.controller_choice
-
-
-    print(args)
+    # print(args)
 
     # Logging startup info
     log_level = logging.DEBUG if args.debug else logging.INFO
@@ -742,15 +738,7 @@ def main():
     # Execute when server connection is established
     while True:
         try:
-            if args.controller_choice =='lp':
-                print("enter your gains for longitudinal PID")
-    
-                kp = float(input("enter kp="))
-                ki = float(input("enter ki="))
-                kd = float(input("enter kd="))
-                exec_waypoint_nav_demo(args,kp,ki,kd)
-            else :
-                exec_waypoint_nav_demo(args)
+            exec_waypoint_nav_demo(args)
             print('Done.')
             return
 
