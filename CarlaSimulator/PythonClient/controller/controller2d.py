@@ -56,10 +56,12 @@ class Controller2D(object):
     #         desired_speed = self._waypoints[-1][2]
 
     def rear_axle_coord(self):
-        l = 1.5 #(in meters)
-        rear_axle_x = self._current_x - l*np.cos(self._current_yaw)
-        rear_axle_y = self._current_y - l*np.sin(self._current_yaw)
-        return rear_axle_x, rear_axle_y 
+
+
+        x = self._current_x - self._vehicle_length*np.cos(self._current_yaw)/2
+        y = self._current_y - self._vehicle_length*np.sin(self._current_yaw)/2
+
+        return x,y
 
 
     def front_axle_coord(self):
