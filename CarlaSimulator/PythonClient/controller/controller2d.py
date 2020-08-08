@@ -152,18 +152,18 @@ class Controller2D(object):
 
     def get_cte(self,x,y):
 
-        x,y = self.front_axle_coord(x,y)
-        i = self.get_min_index(x,y)
+        x, y = self.front_axle_coord(x, y)
+        i = self.get_min_index(x, y)
         cte = np.sqrt((self._waypoints[i][1]-y)**2+(self._waypoints[i][0]-x)**2)
         return cte 
 
 
-    def get_head_err(self,x,y,yaw):
+    def get_head_err(self, x, y, yaw):
 
-        x,y = self.front_axle_coord(x,y)
+        x,y = self.front_axle_coord(x, y)
         
-        min_idx = self.get_min_index(x,y)
-        target_x,target_y,target_x_n,target_y_n = self.get_target_coord(min_idx)
+        min_idx = self.get_min_index(x, y)
+        target_x, target_y, target_x_n, target_y_n = self.get_target_coord(min_idx)
  
         try:
             delta_y = target_y_n - target_y
@@ -175,7 +175,7 @@ class Controller2D(object):
         head = np.arctan2(delta_y, delta_x)
         delta = head - yaw
        
-        print(type(delta))
+        
 
         # if delta > :
         #     delta = delta - self._2pi
@@ -185,8 +185,7 @@ class Controller2D(object):
         return delta
 
 
-   
-    def colloc_constraints(self,x_c,y_c,v_c,yaw,steering,cte,throttle):
+    def colloc_constraints(self, x_c, y_c, v_c, yaw, steering, cte, throttle):
 
         delta_t = 0.01
 
@@ -198,13 +197,13 @@ class Controller2D(object):
         
         yaw_next = yaw + v_c*steering/self._vehicle_length
 
-        head_err = self.get_head_err(x_c,y_c,yaw)
+        head_err = self.get_head_err(x_c, y_c, yaw)
 
-        cte = self.get_cte(x_c,y_c)
+        cte = self.get_cte(x_c, y_c)
 
         cte_next = cte + v_c*np.sin(head_err-steering)*delta_t
         
-        return x_next,y_next,yaw_next,v_next,head_err,cte_next
+        return x_next, y_next, yaw_next, v_next, head_err, cte_next
 
     
     def mpc(self):
@@ -223,30 +222,30 @@ class Controller2D(object):
         throttle = opti.variable(N)
 
         p_cte = opti.parameter()  # parameter for the cross track error
-        opti.set_value(p_cte,1)
+        opti.set_value(p_cte, 1)
 
         p_he = opti.parameter()   # parameter for the heading error
-        opti.set_value(p_he,1)
+        opti.set_value(p_he, 1)
 
         p_steer = opti.parameter() # parameter for the steering
-        opti.set_value(p_steer,1)
+        opti.set_value(p_steer, 1)
 
         p_sr = opti.parameter() # parameter for the steering rate
-        opti.set_value(p_sr,1)
+        opti.set_value(p_sr, 1)
         
         p_vel = opti.parameter() # parameter for the target velocity
-        opti.set_value(p_vel,1)
+        opti.set_value(p_vel, 10)
 
         p_thr = opti.parameter() # parameter for the throttle
-        opti.set_value(p_thr,1)
+        opti.set_value(p_thr, 1)
 
         p_thr_r = opti.parameter() # parameter for the throttle rate 
-        opti.set_value(p_thr_r,1)
+        opti.set_value(p_thr_r, 1)
 
         
         v_target = []
 
-        for i in range(0,N-1):
+        for i in range(0, N-1):
 
             x_next, y_next, v_next, yaw_next, head_err, cte_next = self.colloc_constraints(x[i], y[i], v[i], \
                                                                      steering[i], yaw[i], cte[i], throttle[i])
@@ -260,22 +259,16 @@ class Controller2D(object):
             x_f, y_f = self.front_axle_coord(x[i], y[i])
             speed = self.get_target_speed(x_f, y_f)
 
-            print(type(v_target))
+            
             v_target.append(speed)
 
         x_f, y_f = self.front_axle_coord(x[i], y[i])
         speed = self.get_target_speed(x_f, y_f)
-
-        print(type(v_target))
         v_target.append(speed)
         
 
         cte_cost = sumsqr(p_cte*cte[:])
-        print(cte_cost)
-
         steer_cost = sumsqr(p_steer*steering[:])
-        print(steer_cost)
-
         steer_rate_cost = sumsqr(p_sr*(steering[1:N]-steering[0:-1]))
         velocity_cost = sumsqr(p_vel**(v_target-v))
         throttle_cost = sumsqr(p_thr*(throttle[:]))
@@ -287,19 +280,28 @@ class Controller2D(object):
                                                     throttle_rate_cost + head_err_cost   
         
 
-        print(cost_function.shape)
+        
         opti.subject_to(x[0] == self._current_x)
         opti.subject_to(y[0] == self._current_y)
         opti.subject_to(opti.bounded(-1.22, steering, 1.22))
         opti.subject_to(opti.bounded(-1, throttle, 1))
-        opti.subject_to(opti.bounded(-np.pi ,head_err, np.pi))
+        opti.subject_to(opti.bounded(-np.pi, head_err, np.pi))
 
         opti.minimize(cost_function)
 
         opti.solver("ipopt")
         sol = opti.solve()
 
-        print(sol.value(throttle))
+        throttle_output = sol.value(throttle)
+        steer_output = sol.value(steering)
+
+        return steer_output[0], throttle_output[0]
+
+        # print(sol.value(v))
+        # print(sol.value(x))
+        # print (sol.value(head_err))
+        # print(sol.value(steering))
+        
 
 
     def update_controls(self):
@@ -389,10 +391,15 @@ class Controller2D(object):
             # brake_output is optional and is not required to pass the
             # assignment, as the car will naturally slow down over time.
             throttle_output = 0
-            brake_output    = 0
+            brake_output = 0
+            steer_output = 0
+
             
-            self.mpc()
-            print("first iteration successful")
+            print(self._current_timestamp)
+            steer_output, throttle_output = self.mpc()
+            
+            print(steer_output)
+            print(self._current_timestamp)
             ######################################################
             ######################################################
             # MODULE 7: IMPLEMENTATION OF LATERAL CONTROLLER HERE
@@ -405,8 +412,7 @@ class Controller2D(object):
             """
             
             # Change the steer output with the lateral controller. 
-            steer_output    = 0
-
+            
             ######################################################
             # SET CONTROLS OUTPUT
             ######################################################
