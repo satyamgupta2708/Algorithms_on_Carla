@@ -56,76 +56,6 @@ class Controller2D(object):
     #         desired_speed = self._waypoints[-1][2]
     #     self._desired_speed = desired_speed
 
-
-    
-
-    # def update_desired_speed(self):
-    #     min_idx       = 0
-    #     min_dist      = float("inf")
-    #     desired_speed = 0
-    #     x,y = self.front_axle_coord()
-    #     for i in range(len(self._waypoints)):
-    #         dist = np.linalg.norm(np.array([
-    #                 self._waypoints[i][0] - x,
-    #                 self._waypoints[i][1] - y]))
-    #         if dist < min_dist:
-    #             min_dist = dist
-    #             min_idx = i
-    #     if min_idx < len(self._waypoints)-1:
-    #         desired_speed = self._waypoints[min_idx][2]
-    #         self._min_idx = min_idx
-    #     else:
-    #         desired_speed = self._waypoints[-1][2]
-    #         self._min_idx = -1
-    #     self._desired_speed = desired_speed
-
-    def front_axle_coord(self,x,y):
-        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)/2
-        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)/2
-
-        return x,y
-
-    # def get_min_index(self,x,y):
-        
-    #     min_dist = float("inf")
-    #     min_idx  = 0
-
-    #     for i in range(len(self._waypoints)):
-    #         dist = np.linalg.norm(np.array([
-    #                 self._waypoints[i][0] - x,
-    #                 self._waypoints[i][1] - y]))
-    #         if dist < min_dist:
-    #             min_dist = dist
-    #             min_idx = i
-    #     print('min_idx',min_idx)
-    #     return min_idx
-
-
-
-    def get_target_speed(self,x,y):
-
-        desired_speed = 0
-        x,y = self.front_axle_coord(x,y)
-        
-        min_idx = self.get_min_index(x,y)
-
-        if min_idx < len(self._waypoints)-1:
-            target_speed = self._waypoints[min_idx][2]
-            
-        else:
-            target_speed = self._waypoints[-1][2]
-            
-        return target_speed
-
-    # def get_target_coord(self, min_idx):
-
-    #     target_x = self._waypoints[min_idx][0]
-    #     target_y = self._waypoints[min_idx][1]
-    #     target_x_n = self._waypoints[min_idx+1][0]
-    #     target_y_n = self._waypoints[min_idx+1][1]
-        
-    #     return target_x, target_y, target_x_n, target_y_n
-
     def update_waypoints(self, new_waypoints):
         self._waypoints = new_waypoints
 
@@ -150,67 +80,90 @@ class Controller2D(object):
         brake           = np.fmax(np.fmin(input_brake, 1.0), 0.0)
         self._set_brake = brake
 
+    def front_axle_coord(self,x,y):
+        x = self._current_x + self._vehicle_length*np.cos(self._current_yaw)/2
+        y = self._current_y + self._vehicle_length*np.sin(self._current_yaw)/2
 
-    # def get_cte(self,x,y):
-
-    #     x, y = self.front_axle_coord(x, y)
-    #     i = self.get_min_index(x, y)
-    #     cte = np.sqrt((self._waypoints[i][1]-y)**2+(self._waypoints[i][0]-x)**2)
-    #     return cte 
+        return x,y
 
 
-    # def get_head_err(self, x, y, yaw):
+    def get_ref(self, min_idx, horizon):
 
-    #     x,y = self.front_axle_coord(x, y)
+        x_target = np.array(self._waypoints)[min_idx: min_idx + horizon,[0]]
+        y_target = np.array(self._waypoints)[min_idx: min_idx + horizon,[1]]
+        v_target = np.array(self._waypoints)[min_idx: min_idx + horizon,[2]]
+
+        return x_target, y_target, v_target
+
+
+    
+    def get_horizon(self):
         
-    #     min_idx = self.get_min_index(x, y)
-    #     target_x, target_y, target_x_n, target_y_n = self.get_target_coord(min_idx)
- 
-    #     try:
-    #         delta_y = target_y_n - target_y
-    #         delta_x = target_x_n - target_x
-    #     except:
-    #         delta_x = 0
-    #         delta_y = 0
+        x, y = self.front_axle_coord(self._current_x, self._current_y)
+        min_dist = float("inf")
+        min_idx  = 0
 
-    #     head = np.arctan2(delta_y, delta_x)
-    #     delta = head - yaw
+        for i in range(len(self._waypoints)):
+            dist = np.linalg.norm(np.array([
+                    self._waypoints[i][0] - x,
+                    self._waypoints[i][1] - y]))
+            if dist < min_dist:
+                min_dist = dist
+                min_idx = i
+
+        if min_idx < len(self._waypoints)-1:
+            desired_speed = self._waypoints[min_idx][2]
+            self._min_idx = min_idx
+        else:
+            desired_speed = self._waypoints[-1][2]
+            self._min_idx = -1
+        self._desired_speed = desired_speed
+        
+        
+
+        horizon = len(self._waypoints) - min_idx
+        
+        print('length of waypoints', len(self._waypoints))
+        print("horizon", horizon)
+        print("min_idx", min_idx)
+        
+        threshold = 100 
+        if horizon < threshold:
+           
+           x_target, y_target, v_target = self.get_ref(min_idx, horizon)
+           print("true")
+        
+        else:
+
        
-        
-
-    #     # if delta > :
-    #     #     delta = delta - self._2pi
-    #     # if delta < -np.pi:
-    #     #     delta = delta + self._2pi
-
-    #     return delta
+            horizon = threshold
+            x_target, y_target, v_target = self.get_ref(min_idx, horizon)
+       
+        return x_target, y_target, v_target, horizon
 
 
-    def colloc_constraints(self, x_f, y_f, v_f, steering, yaw, throttle):
 
-        delta_t = 0.05
+    def colloc_constraints(self, x_f, y_f, v_f, steering, yaw, throttle_n):
+
+        delta_t = 0.005
 
         x_f_next = x_f + v_f*np.cos(yaw)*delta_t
 
         y_f_next = y_f + v_f*np.sin(yaw)*delta_t
 
-        v_next = v_f + throttle*delta_t
-        
-        print(throttle.shape())
+        v_f_next = v_f + throttle_n*delta_t
+
         yaw_next = yaw + v_f*steering/self._vehicle_length
-
-        # head_err_c = self.get_head_err(x_c, y_c, yaw)
-
-        # cte = self.get_cte(x_c, y_c)
-
-        # cte_next = cte + v_c*np.sin(head_err_c-steering)*delta_t
         
-        return x_f_next, y_f_next, yaw_next, v_next, 
+        return x_f_next, y_f_next, yaw_next, v_f_next, 
     
     
     def mpc(self):
         
-        N = 40
+        x_target, y_target, v_target, horizon = self.get_horizon()
+
+        N = horizon 
+
     	
         opti = ca.Opti()
 
@@ -218,9 +171,8 @@ class Controller2D(object):
         y = opti.variable(N)
         v = opti.variable(N)
         yaw = opti.variable(N)
-        # head_err = opti.variable(N)
+
         steering = opti.variable(N)
-        # cte = opti.variable(N)
         throttle = opti.variable(N)
 
         p_x = opti.parameter()  # parameter for the cross track error
@@ -239,53 +191,46 @@ class Controller2D(object):
         opti.set_value(p_vel, 1)
 
         p_thr = opti.parameter() # parameter for the throttle
-        opti.set_value(p_thr, 1)
+        opti.set_value(p_thr, 0.011)
 
         p_thr_r = opti.parameter() # parameter for the throttle rate 
-        opti.set_value(p_thr_r, 1)
+        opti.set_value(p_thr_r, 0.011)
 
-        
-        v_target = []
+       
 
         for i in range(0, N-1):
 
             x_next, y_next, yaw_next, v_next = self.colloc_constraints(x[i], y[i], v[i], \
-                                                                     steering[i], yaw[i], throttle[i])
+                                                      steering[i], yaw[i], throttle[i])
 
             opti.subject_to(x[i+1] == x_next)
             opti.subject_to(y[i+1] == y_next)
             opti.subject_to(v[i+1] == v_next)
             opti.subject_to(yaw[i+1] == yaw_next)
-            opti.subject_to(cte[i+1] == cte_next)
             
             
-            x_f, y_f = self.front_axle_coord(x[i], y[i])
-            speed = self.get_target_speed(x_f, y_f)
-            v_target.append(speed)
+        x_cost = sumsqr(p_x*(x_target-x))
+        y_cost = sumsqr(p_y*(y_target-y))
+        velocity_cost = sumsqr(p_vel**(v_target-v))
+
+        steer_cost = sumsqr(p_steer*steering[:])
+        steer_rate_cost = sumsqr(p_sr*(steering[1:N]-steering[0:N-1]))
         
+        throttle_cost = sumsqr(p_thr*(throttle[:]))
+        throttle_rate_cost = sumsqr(p_thr_r*(throttle[1:N]-throttle[0:N-1]))
         
-        x_f, y_f = self.front_axle_coord(x[i], y[i])
-        speed = self.get_target_speed(x_f, y_f)
-        v_target.append(speed)
         
 
-        # cte_cost = sumsqr(p_cte*cte[:])
-        # steer_cost = sumsqr(p_steer*steering[:])
-        # steer_rate_cost = sumsqr(p_sr*(steering[1:N]-steering[0:N-1]))
-        # velocity_cost = sumsqr(p_vel**(v_target-v))
-        # throttle_cost = sumsqr(p_thr*(throttle[:]))
-        # throttle_rate_cost = sumsqr(p_thr_r*(throttle[1:N]-throttle[0:N-1]))
-        # head_err_cost = sumsqr(p_he*(head_err))
+        cost_function = x_cost+ y_cost+ steer_rate_cost+ steer_cost+ velocity_cost+ \
+                                                    throttle_cost+ throttle_rate_cost   
         
 
-        # cost_function = cte_cost + steer_rate_cost + steer_cost + velocity_cost + throttle_cost + \
-        #                                             throttle_rate_cost + head_err_cost   
+        x_f_i, y_f_i = self.front_axle_coord(self._current_x, self._current_y)
+
         
-
-        x_f_i, y_f_i = front_axle_coord(self._current_x, self._current_y)
-
         opti.subject_to(x[0] == x_f_i)
         opti.subject_to(y[0] == y_f_i)
+        opti.subject_to(v[0] == self._desired_speed)
         
         opti.subject_to(opti.bounded(-1.22, steering, 1.22))
         opti.subject_to(opti.bounded(0, throttle, 1.5))
@@ -299,11 +244,11 @@ class Controller2D(object):
 
 
         opti.minimize(cost_function)
-
-        # opti.solver("ipopt")
         sol = opti.solve()
 
         throttle_output = sol.value(throttle)
+
+        print(throttle_output)
         steer_output = sol.value(steering)
 
         return steer_output[0], throttle_output[0]
