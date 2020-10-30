@@ -6,6 +6,9 @@
 
 import cutils
 import numpy as np
+from transformation import map2car
+import matplotlib.pyplot as plt
+import math as mt
 
 class Controller2D(object):
     def __init__(self, waypoints):
@@ -220,6 +223,10 @@ class Controller2D(object):
         current_speed = self._current_speed
 
         cte, head_err = self.get_cte_head_err()
+        
+        # cte, head_err = self.he_cte_car()
+
+        print("world_frame_head_err",  head_err)
 
         if  head_err < 0:
             cte   = -1*cte
@@ -242,7 +249,7 @@ class Controller2D(object):
 
         cte = ((target_y-y)*np.cos(yaw)-(target_x-x)*np.sin(yaw))  ###cross_track_error 
              
-            
+        print('cte_world_frame=', cte)    
         k = 2*cte/(look_ahead_distance**2) 
         steer_output = np.arctan(k*L)
         
@@ -295,8 +302,34 @@ class Controller2D(object):
         average_displacement_error = self.vars.disp_error/(self.vars.counter)
         return average_displacement_error
 
-    
+    def he_cte_car(self):
+       
+        x_waypts = []
+        y_waypts = []
 
+        Car_ref_x = 0
+        Car_ref_y = 0
+        Car_ref_yaw = 0 
+        waypoints = np.array(self._waypoints)    #converting list to numpy array 
+        
+        waypoints_wrld = np.column_stack((waypoints[:,0:2], np.zeros(len(self._waypoints)), np.ones(len(self._waypoints))))
+        # print(waypoints_wrld)
+       
+        way_pts = map2car(self._current_yaw, self._current_x, self._current_y, waypoints_wrld)
+        # print(way_pts)
+        x_waypts = way_pts[0,:]
+        y_waypts = way_pts[1,:]
+
+        poly = np.polyfit(x_waypts, y_waypts, 3)    # poly is the set of coefficients when curve is fit b/w x and y points
+
+        cte = np.polyval(poly, Car_ref_x)-Car_ref_y
+
+        he = Car_ref_yaw - np.arctan(poly[1]) 
+
+        # print('car frame',he)
+
+        return he, cte
+        
 
     def update_controls(self,option):
        ######################################################
@@ -424,11 +457,12 @@ class Controller2D(object):
                 # k = 0.75
                 # ks = 0.00
                 # steer_output = self.stanley(k,ks)
-
+                self.he_cte_car()
                 steer_output = self.stanley()  
 
             elif option == 'pp':
                 print("using pure pursuit")
+                self.hte_cte_car()
                 # look ahead distance constant ---Kpp 
                 # Kpp = 1.5
                 # steer_output = self.pure_pursuit(x,y,yaw,waypoints,Kpp)
@@ -436,7 +470,7 @@ class Controller2D(object):
                 steer_output = self.pure_pursuit(x,y,yaw,waypoints)
             
 
-            print(steer_output)
+            # print(steer_output)
 
             ######################################################
             # SET CONTROLS OUTPUT
